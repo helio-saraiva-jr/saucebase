@@ -4,11 +4,24 @@
 # Husky pre-commit hook
 # --------------------------------
 
-# Run PHP and JS linters
-composer lint
+# Run PHP linter when PHP is available in the Husky shell environment
+PHP_BIN=""
+if command -v php >/dev/null 2>&1; then
+    PHP_BIN="php"
+elif command -v php.exe >/dev/null 2>&1; then
+    PHP_BIN="php.exe"
+elif [ -x "/c/Users/helio/.config/herd/bin/php" ]; then
+    PHP_BIN="/c/Users/helio/.config/herd/bin/php"
+fi
+
+if [ -n "$PHP_BIN" ]; then
+    "$PHP_BIN" vendor/bin/pint
+else
+    echo "Warning: php not found in Husky PATH, skipping Pint"
+fi
 
 # Run lint-staged if npx is available
-if command -v npx &> /dev/null; then
+if command -v npx >/dev/null 2>&1; then
     npx lint-staged
 else
     echo "Warning: npx not found, skipping lint-staged"

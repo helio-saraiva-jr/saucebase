@@ -12,11 +12,16 @@ async function createConfig() {
     const sslCertPath = 'docker/ssl/app.pem';
     const hasSSL = fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath);
 
+    const isHttpsUrl = process.env.APP_URL
+        ? process.env.APP_URL.startsWith('https://')
+        : false;
+    const useHttps = hasSSL && isHttpsUrl;
+
     // Collect module language paths
     const moduleLangPaths = await collectModuleLangPaths();
 
     return defineConfig({
-        server: hasSSL
+        server: useHttps
             ? {
                   https: {
                       key: fs.readFileSync(sslKeyPath),

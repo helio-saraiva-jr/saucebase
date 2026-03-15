@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ad85136b4ea4d274d1494b647bc5475c",
+    "content-hash": "bef6a53cad91a969c2eb2e15b58e0368",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -5977,6 +5977,50 @@
                 }
             ],
             "time": "2025-02-25T09:09:36+00:00"
+        },
+        {
+            "name": "saucebase/auth",
+            "version": "v0.0.8",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/sauce-base/auth.git",
+                "reference": "2c65b8ca81df8185a7a468acff3d44f73e3151a8"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/sauce-base/auth/zipball/2c65b8ca81df8185a7a468acff3d44f73e3151a8",
+                "reference": "2c65b8ca81df8185a7a468acff3d44f73e3151a8",
+                "shasum": ""
+            },
+            "require": {
+                "laravel/socialite": "^5.21"
+            },
+            "type": "saucebase-module",
+            "extra": {
+                "laravel": {
+                    "aliases": [],
+                    "providers": []
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Auth\\": "app/",
+                    "Modules\\Auth\\Database\\Seeders\\": "database/seeders/",
+                    "Modules\\Auth\\Database\\Factories\\": "database/factories/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "authors": [
+                {
+                    "name": "Sauce Base",
+                    "email": "hello@saucebase.dev"
+                }
+            ],
+            "support": {
+                "issues": "https://github.com/sauce-base/auth/issues",
+                "source": "https://github.com/sauce-base/auth/tree/v0.0.8"
+            },
+            "time": "2026-01-08T21:17:25+00:00"
         },
         {
             "name": "scrivo/highlight.php",

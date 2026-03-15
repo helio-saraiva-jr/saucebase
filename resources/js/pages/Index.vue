@@ -99,7 +99,7 @@ onUnmounted(() => {
                 <p class="mb-8 text-xl text-gray-600 dark:text-gray-400">
                     {{
                         $t(
-                            'Clone the repo, start building scalable and maintainable SaaS applications quickly. Built with the VILT stack - completely free and open source.',
+                            '   start building scalable and maintainable SaaS applications quickly. Built with the VILT stack - completely free and open source.',
                         )
                     }}
                 </p>

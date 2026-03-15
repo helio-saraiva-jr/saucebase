@@ -20,6 +20,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
         "nwidart/laravel-modules": "^12.0",
+        "saucebase/auth": "^0.0.8",
         "spatie/laravel-navigation": "^1.3",
         "spatie/laravel-permission": "^6.24",
         "tightenco/ziggy": "^2.0"
@@ -96,7 +97,7 @@
             "vendor/bin/phpstan analyse --memory-limit=2G"
         ],
         "lint": [
-            "vendor/bin/pint"
+            "@php vendor/bin/pint"
         ]
     },
     "extra": {
