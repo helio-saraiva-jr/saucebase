@@ -2,6 +2,7 @@
 import AppSidebar from '@/components/Navigation/AppSidebar.vue';
 import PageTransition from '@/components/PageTransition.vue';
 import ThemeSelector from '@/components/ThemeSelector.vue';
+import Badge from '@/components/ui/badge/Badge.vue';
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -37,6 +38,12 @@ const displayBreadcrumbs = computed(() => {
     if (props.breadcrumbs?.length) return props.breadcrumbs;
     return page.props.breadcrumbs || [];
 });
+
+const profile = computed(() => page.props.auth?.profile || null);
+const canSwitchProfile = computed(
+    () => page.props.dev?.profileSwitcherEnabled === true,
+);
+const previousProfile = computed(() => page.props.dev?.previousProfile || null);
 </script>
 
 <template>
@@ -103,7 +110,61 @@ const displayBreadcrumbs = computed(() => {
                         </BreadcrumbList>
                     </Breadcrumb>
                 </div>
-                <div class="ml-auto pr-4">
+                <div class="ml-auto flex items-center gap-2 pr-4">
+                    <Badge
+                        v-if="profile"
+                        :variant="
+                            profile.key === 'representative'
+                                ? 'default'
+                                : 'secondary'
+                        "
+                    >
+                        Perfil: {{ profile.label }}
+                    </Badge>
+
+                    <template v-if="canSwitchProfile && profile">
+                        <Link
+                            v-if="
+                                previousProfile &&
+                                previousProfile !== profile.key
+                            "
+                            :href="
+                                route('dev.profile.switch', { profile: 'back' })
+                            "
+                            method="post"
+                            as="button"
+                            class="hover:bg-muted rounded-md border px-2 py-1 text-xs font-medium"
+                        >
+                            Voltar perfil anterior
+                        </Link>
+                        <Link
+                            v-if="profile.key !== 'representative'"
+                            :href="
+                                route('dev.profile.switch', {
+                                    profile: 'representative',
+                                })
+                            "
+                            method="post"
+                            as="button"
+                            class="hover:bg-muted rounded-md border px-2 py-1 text-xs font-medium"
+                        >
+                            Entrar como Representante
+                        </Link>
+                        <Link
+                            v-if="profile.key !== 'client'"
+                            :href="
+                                route('dev.profile.switch', {
+                                    profile: 'client',
+                                })
+                            "
+                            method="post"
+                            as="button"
+                            class="hover:bg-muted rounded-md border px-2 py-1 text-xs font-medium"
+                        >
+                            Entrar como Cliente
+                        </Link>
+                    </template>
+
                     <ThemeSelector mode="standalone" />
                 </div>
             </header>

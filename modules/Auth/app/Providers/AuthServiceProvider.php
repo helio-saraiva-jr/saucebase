@@ -22,6 +22,20 @@ class AuthServiceProvider extends ModuleServiceProvider
     protected function shareInertiaData(): void
     {
         Inertia::share('auth.user', fn () => Auth::user());
+        Inertia::share('auth.profile', function () {
+            $user = Auth::user();
+
+            if (! $user) {
+                return null;
+            }
+
+            $isRepresentative = $user->hasRole('admin');
+
+            return [
+                'key' => $isRepresentative ? 'representative' : 'client',
+                'label' => $isRepresentative ? 'Representante' : 'Cliente',
+            ];
+        });
         Inertia::share('canLogin', true);
         Inertia::share('canRegister', true);
     }

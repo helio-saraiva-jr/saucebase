@@ -1,0 +1,29 @@
+{
+    "name": "saucebase/megacombo",
+    "description": "Megacombo commercial intelligence module",
+    "type": "saucebase-module",
+    "authors": [
+        {
+            "name": "Sauce Base",
+            "email": "hello@saucebase.dev"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Megacombo\\": "app/",
+            "Modules\\Megacombo\\Database\\Factories\\": "database/factories/",
+            "Modules\\Megacombo\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Megacombo\\Tests\\": "tests/"
+        }
+    }
+}

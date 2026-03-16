@@ -43,6 +43,12 @@ class HandleInertiaRequests extends Middleware
 
         return array_merge(parent::share($request), [
             'locale' => app()->getLocale(),
+            'dev' => [
+                'profileSwitcherEnabled' => app()->environment('local'),
+                'previousProfile' => app()->environment('local')
+                    ? $request->session()->get('dev.previous_profile')
+                    : null,
+            ],
             'navigation' => app(Navigation::class)->treeGrouped(),
             'breadcrumbs' => $this->getBreadcrumbs(),
             'toast' => fn () => $request->session()->pull('toast'),

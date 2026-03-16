@@ -1,0 +1,11 @@
+{
+    "name": "Megacombo",
+    "alias": "megacombo",
+    "description": "Commercial intelligence platform for consortia representatives",
+    "author": "Sauce Base",
+    "version": "v0.0.1",
+    "keywords": ["consortium", "finance", "dashboard"],
+    "priority": 0,
+    "providers": ["Modules\\Megacombo\\Providers\\MegacomboServiceProvider"],
+    "files": []
+}

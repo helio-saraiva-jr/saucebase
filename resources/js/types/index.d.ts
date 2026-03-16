@@ -6,6 +6,11 @@ export interface User {
     last_login_at: string | null;
 }
 
+export interface AuthProfile {
+    key: 'representative' | 'client';
+    label: 'Representante' | 'Cliente';
+}
+
 export interface Breadcrumb {
     title: string;
     url?: string;
@@ -42,6 +47,11 @@ export type PageProps<
 > = T & {
     auth: {
         user: User;
+        profile?: AuthProfile | null;
+    };
+    dev?: {
+        profileSwitcherEnabled?: boolean;
+        previousProfile?: AuthProfile['key'] | null;
     };
     locale?: string;
     locales?: Record<string, string>;

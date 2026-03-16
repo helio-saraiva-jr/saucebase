@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue';
 import IconHelpCircle from '~icons/lucide/help-circle';
+import IconLineChart from '~icons/lucide/line-chart';
 import IconLogOut from '~icons/lucide/log-out';
 import IconSettings from '~icons/lucide/settings';
 import IconShieldCheck from '~icons/lucide/shield-check';
@@ -21,6 +22,7 @@ const props = defineProps<{ icon?: string | null }>();
 const iconMapping: Record<string, Component> = {
     settings: IconSettings,
     dashboard: IconSquareTerminal,
+    megacombo: IconLineChart,
     profile: IconUserCircle,
     logout: IconLogOut,
     github: IconGithub,
