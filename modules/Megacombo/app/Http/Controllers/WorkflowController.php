@@ -2,7 +2,10 @@
 
 namespace Modules\Megacombo\Http\Controllers;
 
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Modules\Megacombo\Models\Lead;
 use Modules\Megacombo\Models\Quota;
 use Inertia\Inertia;
@@ -76,9 +79,11 @@ class WorkflowController
         ]);
     }
 
-    public function clientPortal(): Response
+    public function clientPortal(Request $request): Response
     {
-        $quota = Quota::query()
+        $clientUser = $request->user();
+
+        $quotasQuery = Quota::query()
             ->leftJoin('megacombo_leads', 'megacombo_quotas.lead_id', '=', 'megacombo_leads.id')
             ->select([
                 'megacombo_quotas.id',
@@ -89,22 +94,107 @@ class WorkflowController
                 'megacombo_quotas.remaining_installments',
                 'megacombo_quotas.status',
                 'megacombo_leads.name as client_name',
+                'megacombo_leads.risk_profile as risk_profile',
+                'megacombo_leads.email as client_email',
             ])
-            ->latest('megacombo_quotas.id')
-            ->first();
+            ->orderByDesc('megacombo_quotas.id');
 
-        $creditValue = $quota ? (float) $quota->credit_value : 500000.0;
-        $installmentValue = $quota ? (float) $quota->installment_value : 3200.0;
-        $remainingInstallments = $quota ? (int) $quota->remaining_installments : 216;
-        $inccMonthlyRate = 0.004;
+        if (is_string($clientUser?->email) && $clientUser->email !== '') {
+            $quotasQuery->where('megacombo_leads.email', $clientUser->email);
+        }
+
+        $rawQuotas = $quotasQuery->get();
+
+        if ($rawQuotas->isEmpty()) {
+            $rawQuotas = Quota::query()
+                ->leftJoin('megacombo_leads', 'megacombo_quotas.lead_id', '=', 'megacombo_leads.id')
+                ->select([
+                    'megacombo_quotas.id',
+                    'megacombo_quotas.group_code',
+                    'megacombo_quotas.quota_number',
+                    'megacombo_quotas.status',
+                    'megacombo_leads.name as client_name',
+                    'megacombo_leads.risk_profile as risk_profile',
+                ])
+                ->orderByDesc('megacombo_quotas.id')
+                ->limit(1)
+                ->get();
+        }
+
+        // Business rule: each quota has fixed contractual values.
+        $quotaCreditValue = 100000.0;
+        $quotaInstallmentValue = 644.02;
+        $quotaTermMonths = 216;
+
+        $quotas = $rawQuotas
+            ->map(function ($quota) use ($quotaCreditValue, $quotaInstallmentValue, $quotaTermMonths, $clientUser) {
+                return [
+                    'id' => $quota->id,
+                    'group_code' => $quota->group_code,
+                    'quota_number' => $quota->quota_number,
+                    'credit_value' => round($quotaCreditValue, 2),
+                    'installment_value' => round($quotaInstallmentValue, 2),
+                    'remaining_installments' => $quotaTermMonths,
+                    'status' => $quota->status ?? 'active',
+                    'client_name' => $quota->client_name ?? $clientUser?->name ?? 'Cliente Megacombo',
+                ];
+            })
+            ->values();
+
+        $quotaCount = max($quotas->count(), 1);
+
+        $scenarioProfiles = [
+            'conservador' => [
+                'label' => 'Conservador',
+                'incc_monthly_rate' => 0.0032,
+                'projected_agio_rate' => 0.04,
+            ],
+            'equilibrado' => [
+                'label' => 'Equilibrado',
+                'incc_monthly_rate' => 0.0040,
+                'projected_agio_rate' => 0.08,
+            ],
+            'arrojado' => [
+                'label' => 'Arrojado',
+                'incc_monthly_rate' => 0.0048,
+                'projected_agio_rate' => 0.12,
+            ],
+        ];
+
+        $requestedProfile = trim((string) $request->query('profile', ''));
+        $activeProfileKey = $this->resolveScenarioProfileKey(
+            $requestedProfile !== '' ? $requestedProfile : (string) ($rawQuotas->first()->risk_profile ?? ''),
+            array_keys($scenarioProfiles)
+        );
+        $activeScenario = $scenarioProfiles[$activeProfileKey];
+
+        $creditValue = $quotaCreditValue * $quotaCount;
+        $installmentValue = $quotaInstallmentValue * $quotaCount;
+        $remainingInstallments = $quotaTermMonths;
+        $clientName = (string) ($quotas->first()['client_name'] ?? $clientUser?->name ?? 'Cliente Megacombo');
+        $assembliesCount = $quotas
+            ->pluck('group_code')
+            ->filter(fn ($groupCode) => is_string($groupCode) && $groupCode !== '')
+            ->unique()
+            ->count();
+        $inccMonthlyRate = (float) $activeScenario['incc_monthly_rate'];
+        $selicReference = $this->resolveSelicAnnualRate();
+        $selicAnnualRate = $selicReference['annual_rate'];
+        $selicMonthlyRate = pow(1 + $selicAnnualRate, 1 / 12) - 1;
+        $projectedAgioRate = (float) $activeScenario['projected_agio_rate'];
         $years = max((int) ceil($remainingInstallments / 12), 1);
 
         $evolution = [];
+        $turningPointTimeline = [];
+        $totalDebtAtStart = $installmentValue * $remainingInstallments;
 
         for ($year = 1; $year <= $years; $year++) {
             $months = min($year * 12, $remainingInstallments);
             $paid = $installmentValue * $months;
             $correctedCredit = $creditValue * pow(1 + $inccMonthlyRate, $months);
+            $outstandingDebt = max($totalDebtAtStart - $paid, 0.0);
+            $totalObligation = $paid + $outstandingDebt;
+            $turningEdge = $correctedCredit - $totalObligation;
 
             $evolution[] = [
                 'label' => 'Ano ' . $year,
@@ -113,22 +203,238 @@ class WorkflowController
                 'corrected_credit' => round($correctedCredit, 2),
                 'patrimony_gap' => round($correctedCredit - $paid, 2),
             ];
+
+            $turningPointTimeline[] = [
+                'label' => 'Ano ' . $year,
+                'year' => $year,
+                'months' => $months,
+                'credit_value' => round($correctedCredit, 2),
+                'outstanding_debt' => round($outstandingDebt, 2),
+                'paid_total' => round($paid, 2),
+                'total_obligation' => round($totalObligation, 2),
+                'turning_edge' => round($turningEdge, 2),
+                'is_turning_point' => $turningEdge >= 0,
+            ];
         }
 
+        $shadowPortfolio = [];
+
+        for ($year = 1; $year <= $years; $year++) {
+            $months = min($year * 12, $remainingInstallments);
+            $consorcioCorrectedCredit = $creditValue * pow(1 + $inccMonthlyRate, $months);
+            $consorcioProjectedSale = $consorcioCorrectedCredit * (1 + $projectedAgioRate);
+
+            $selicProjection = $selicMonthlyRate > 0
+                ? $installmentValue * ((pow(1 + $selicMonthlyRate, $months) - 1) / $selicMonthlyRate)
+                : $installmentValue * $months;
+
+            $edge = $consorcioProjectedSale - $selicProjection;
+
+            $shadowPortfolio[] = [
+                'label' => 'Ano ' . $year,
+                'months' => $months,
+                'consorcio_value' => round($consorcioProjectedSale, 2),
+                'selic_value' => round($selicProjection, 2),
+                'edge_value' => round($edge, 2),
+            ];
+        }
+
+        $shadowLastPoint = $shadowPortfolio[count($shadowPortfolio) - 1] ?? null;
+        $turningPoint = collect($turningPointTimeline)->first(fn ($point) => $point['is_turning_point'] === true);
+        $turningPointLast = $turningPointTimeline[count($turningPointTimeline) - 1] ?? null;
+        $turningPointMarginPercent =
+            is_array($turningPointLast) && $turningPointLast['total_obligation'] > 0
+                ? (($turningPointLast['credit_value'] - $turningPointLast['total_obligation']) / $turningPointLast['total_obligation']) * 100
+                : 0.0;
+        $edgePercent = $shadowLastPoint && $shadowLastPoint['selic_value'] > 0
+            ? (($shadowLastPoint['consorcio_value'] - $shadowLastPoint['selic_value']) / $shadowLastPoint['selic_value']) * 100
+            : 0.0;
+
+        $winningStreakYears = 0;
+        foreach ($shadowPortfolio as $point) {
+            if ($point['edge_value'] <= 0) {
+                break;
+            }
+            $winningStreakYears++;
+        }
+
+        $dailyInccRate = pow(1 + $inccMonthlyRate, 1 / 30) - 1;
+        $dailySelicRate = pow(1 + $selicMonthlyRate, 1 / 30) - 1;
+
+        $level = 'Em aquecimento';
+        if ($edgePercent >= 20) {
+            $level = 'Nivel elite';
+        } elseif ($edgePercent >= 10) {
+            $level = 'Nivel avancado';
+        } elseif ($edgePercent >= 0) {
+            $level = 'Nivel consistente';
+        }
+
+        $whatsappNumber = preg_replace('/\D+/', '', (string) env('WHATSAPP_SUPPORT_NUMBER', '5511999999999'));
+        $acquireMoreMessage = rawurlencode('Ola, quero adquirir mais cotas de consorcio e falar com o especialista.');
+        $acquireMoreUrl = $whatsappNumber !== ''
+            ? "https://wa.me/{$whatsappNumber}?text={$acquireMoreMessage}"
+            : null;
+
         return Inertia::render('Megacombo::ClientPortal', [
-            'quota' => [
-                'id' => $quota?->id,
-                'group_code' => $quota?->group_code,
-                'quota_number' => $quota?->quota_number,
-                'credit_value' => round($creditValue, 2),
-                'installment_value' => round($installmentValue, 2),
-                'remaining_installments' => $remainingInstallments,
-                'status' => $quota?->status ?? 'active',
-                'client_name' => $quota?->client_name ?? 'Cliente Megacombo',
+            'portfolio' => [
+                'client_name' => $clientName,
+                'quota_count' => $quotaCount,
+                'assemblies_count' => $assembliesCount,
+                'quota_credit_value' => round($quotaCreditValue, 2),
+                'quota_installment_value' => round($quotaInstallmentValue, 2),
+                'quota_term_months' => $quotaTermMonths,
+                'credit_value_total' => round($creditValue, 2),
+                'installment_value_total' => round($installmentValue, 2),
+            ],
+            'quotas' => $quotas,
+            'acquireMoreAction' => [
+                'label' => 'Adquirir mais cotas',
+                'url' => $acquireMoreUrl,
+                'enabled' => $acquireMoreUrl !== null,
             ],
             'inccMonthlyRate' => $inccMonthlyRate,
+            'selicAnnualRate' => $selicAnnualRate,
+            'selicSource' => [
+                'provider' => $selicReference['provider'],
+                'series' => $selicReference['series'],
+                'reference_date' => $selicReference['reference_date'],
+                'is_fallback' => $selicReference['is_fallback'],
+            ],
+            'scenario' => [
+                'active' => $activeProfileKey,
+                'options' => collect($scenarioProfiles)
+                    ->map(fn (array $config, string $key) => [
+                        'key' => $key,
+                        'label' => $config['label'],
+                        'incc_monthly_rate' => $config['incc_monthly_rate'],
+                        'projected_agio_rate' => $config['projected_agio_rate'],
+                    ])
+                    ->values()
+                    ->all(),
+            ],
+            'projectedAgioRate' => $projectedAgioRate,
             'evolution' => $evolution,
+            'turningPoint' => [
+                'timeline' => $turningPointTimeline,
+                'summary' => [
+                    'found' => is_array($turningPoint),
+                    'year' => is_array($turningPoint) ? $turningPoint['year'] : null,
+                    'months' => is_array($turningPoint) ? $turningPoint['months'] : null,
+                    'credit_value' => is_array($turningPoint) ? $turningPoint['credit_value'] : null,
+                    'total_obligation' => is_array($turningPoint) ? $turningPoint['total_obligation'] : null,
+                    'turning_edge' => is_array($turningPoint) ? $turningPoint['turning_edge'] : null,
+                    'latest_margin_percent' => round($turningPointMarginPercent, 2),
+                ],
+            ],
+            'shadowPortfolio' => $shadowPortfolio,
+            'shadowSummary' => [
+                'generated_at' => now()->toIso8601String(),
+                'horizon_months' => $shadowLastPoint['months'] ?? 0,
+                'consorcio_value' => $shadowLastPoint['consorcio_value'] ?? 0.0,
+                'selic_value' => $shadowLastPoint['selic_value'] ?? 0.0,
+                'edge_value' => $shadowLastPoint['edge_value'] ?? 0.0,
+                'edge_percent' => round($edgePercent, 2),
+            ],
+            'gamification' => [
+                'level' => $level,
+                'winning_streak_years' => $winningStreakYears,
+                'daily_growth_consorcio' => round($creditValue * $dailyInccRate, 2),
+                'daily_growth_selic' => round(($shadowLastPoint['selic_value'] ?? 0.0) * $dailySelicRate, 2),
+            ],
         ]);
+    }
+
+    /**
+     * Resolve annual Selic rate from BACEN SGS (free public API).
+     * Falls back to a stable default when the API is unavailable.
+     *
+     * @return array{annual_rate: float, provider: string, series: string, reference_date: string|null, is_fallback: bool}
+     */
+    private function resolveSelicAnnualRate(): array
+    {
+        $fallback = [
+            'annual_rate' => 0.1175,
+            'provider' => 'BACEN SGS',
+            'series' => '11',
+            'reference_date' => null,
+            'is_fallback' => true,
+        ];
+
+        $cached = Cache::remember('megacombo.selic.sgs11.latest', now()->addHours(12), function () {
+            $response = Http::timeout(8)
+                ->acceptJson()
+                ->get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.11/dados', [
+                    'formato' => 'json',
+                    'dataInicial' => now()->subDays(30)->format('d/m/Y'),
+                    'dataFinal' => now()->format('d/m/Y'),
+                ]);
+
+            if (! $response->successful()) {
+                return null;
+            }
+
+            $latest = collect($response->json())
+                ->filter(fn ($row) => isset($row['valor']) && is_string($row['valor']))
+                ->last();
+
+            if (! is_array($latest) || ! isset($latest['valor'])) {
+                return null;
+            }
+
+            $ratePercent = (float) str_replace(',', '.', (string) $latest['valor']);
+
+            if ($ratePercent <= 0) {
+                return null;
+            }
+
+            return [
+                'annual_rate' => $ratePercent / 100,
+                'provider' => 'BACEN SGS',
+                'series' => '11',
+                'reference_date' => isset($latest['data']) ? (string) $latest['data'] : null,
+                'is_fallback' => false,
+            ];
+        });
+
+        if (! is_array($cached) || ! isset($cached['annual_rate'])) {
+            return $fallback;
+        }
+
+        return [
+            'annual_rate' => (float) $cached['annual_rate'],
+            'provider' => (string) ($cached['provider'] ?? $fallback['provider']),
+            'series' => (string) ($cached['series'] ?? $fallback['series']),
+            'reference_date' => isset($cached['reference_date']) ? (string) $cached['reference_date'] : null,
+            'is_fallback' => (bool) ($cached['is_fallback'] ?? false),
+        ];
+    }
+
+    /**
+     * @param array<int, string> $allowedKeys
+     */
+    private function resolveScenarioProfileKey(string $rawProfile, array $allowedKeys): string
+    {
+        $normalized = mb_strtolower(trim($rawProfile));
+
+        $aliases = [
+            'conservador' => 'conservador',
+            'conservative' => 'conservador',
+            'equilibrado' => 'equilibrado',
+            'balanced' => 'equilibrado',
+            'moderado' => 'equilibrado',
+            'arrojado' => 'arrojado',
+            'agressivo' => 'arrojado',
+            'aggressive' => 'arrojado',
+        ];
+
+        $resolved = $aliases[$normalized] ?? 'equilibrado';
+
+        if (! in_array($resolved, $allowedKeys, true)) {
+            return 'equilibrado';
+        }
+
+        return $resolved;
     }
 
     public function probabilityEngine(): Response
