@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue';
+import IconBot from '~icons/lucide/bot';
+import IconCalculator from '~icons/lucide/calculator';
+import IconGauge from '~icons/lucide/gauge';
 import IconHelpCircle from '~icons/lucide/help-circle';
 import IconLineChart from '~icons/lucide/line-chart';
 import IconLogOut from '~icons/lucide/log-out';
@@ -23,6 +26,10 @@ const iconMapping: Record<string, Component> = {
     settings: IconSettings,
     dashboard: IconSquareTerminal,
     megacombo: IconLineChart,
+    calculator: IconCalculator,
+    probability: IconGauge,
+    'ai-specialist': IconBot,
+    portal: IconUserCircle,
     profile: IconUserCircle,
     logout: IconLogOut,
     github: IconGithub,

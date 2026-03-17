@@ -4,7 +4,7 @@ import CardContent from '@/components/ui/card/CardContent.vue';
 import CardHeader from '@/components/ui/card/CardHeader.vue';
 import CardTitle from '@/components/ui/card/CardTitle.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = defineProps<{
@@ -513,6 +513,34 @@ const applyScenario = (profile: string) => {
                     </CardContent>
                 </Card>
             </div>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Ferramentas avançadas do cliente</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div class="flex flex-wrap gap-3">
+                        <Link
+                            :href="
+                                route('megacombo.client-financial-calculator')
+                            "
+                            class="inline-flex items-center rounded-md border border-cyan-600 bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-700"
+                        >
+                            Abrir Calculadora de Custo Financeiro
+                        </Link>
+                        <Link
+                            :href="route('megacombo.client-probability-engine')"
+                            class="inline-flex items-center rounded-md border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                        >
+                            Abrir Motor de Probabilidades
+                        </Link>
+                    </div>
+                    <p class="text-muted-foreground mt-3 text-xs">
+                        As ferramentas foram separadas do dashboard e podem ser
+                        acessadas por este atalho ou pelo menu lateral.
+                    </p>
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader>

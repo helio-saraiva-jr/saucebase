@@ -12,7 +12,7 @@ import CardTitle from '@/components/ui/card/CardTitle.vue';
 import Input from '@/components/ui/input/Input.vue';
 import Label from '@/components/ui/label/Label.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
 interface Defaults {
@@ -73,6 +73,11 @@ interface SimulationResponse {
 const props = defineProps<{
     defaults: Defaults;
     constraints: Constraints;
+    audience?: 'representative' | 'client';
+    quickLinks?: Array<{
+        label: string;
+        url: string;
+    }>;
 }>();
 
 const title = 'Calculadora de Custo Financeiro';
@@ -129,6 +134,14 @@ const currency = new Intl.NumberFormat('pt-BR', {
 const rateRangeLabel = computed(
     () =>
         `${props.constraints.desiredRatePercentMin.toFixed(2)}% a ${props.constraints.desiredRatePercentMax.toFixed(2)}% a.m.`,
+);
+
+const isClientAudience = computed(() => props.audience === 'client');
+
+const homeHref = computed(() =>
+    isClientAudience.value
+        ? route('megacombo.client-portal')
+        : route('dashboard'),
 );
 
 const toNumber = (value: string | number): number => {
@@ -412,22 +425,44 @@ void loadHistory();
     <AppLayout
         :title="title"
         :breadcrumbs="[
-            { title: 'Megacombo', href: route('dashboard') },
+            {
+                title: isClientAudience ? 'Portal do cliente' : 'Megacombo',
+                href: homeHref,
+            },
             { title: 'Calculadora de Custo Financeiro' },
         ]"
     >
         <Head :title="title" />
 
         <div class="flex flex-1 flex-col gap-6 p-6 pt-2">
-            <div>
+            <div
+                class="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950 p-6 text-slate-50"
+            >
+                <div
+                    class="pointer-events-none absolute -top-8 -right-8 h-36 w-36 rounded-full bg-cyan-400/20 blur-2xl"
+                />
                 <h1 class="text-3xl font-bold tracking-tight">
                     Calculadora de Custo Financeiro e Comparador de Cenários
                 </h1>
-                <p class="text-muted-foreground mt-1">
+                <p class="mt-2 text-slate-300">
                     Cálculo de precificação de carta contemplada com fórmula de
                     Valor Presente e comparação lado a lado contra financiamento
                     bancário.
                 </p>
+
+                <div
+                    v-if="props.quickLinks && props.quickLinks.length"
+                    class="mt-4 flex flex-wrap gap-2"
+                >
+                    <Link
+                        v-for="quickLink in props.quickLinks"
+                        :key="quickLink.url"
+                        :href="quickLink.url"
+                        class="rounded-full border border-slate-600 px-3 py-1 text-xs text-slate-200 transition hover:bg-slate-800"
+                    >
+                        {{ quickLink.label }}
+                    </Link>
+                </div>
             </div>
 
             <Alert>

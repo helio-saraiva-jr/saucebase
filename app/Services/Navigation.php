@@ -198,6 +198,14 @@ class Navigation extends SpatieNavigation
      */
     protected function isItemActive(array $item): bool
     {
+        if (! empty($item['children']) && is_array($item['children'])) {
+            foreach ($item['children'] as $child) {
+                if ($this->isItemActive($child)) {
+                    return true;
+                }
+            }
+        }
+
         $itemUrl = $item['url'] ?? null;
 
         if (! $itemUrl) {

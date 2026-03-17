@@ -33,6 +33,10 @@ class ProbabilitySimulationRequest extends FormRequest
 
             'multiplier.quotas' => ['nullable', 'integer', 'min:1', 'max:20'],
             'multiplier.horizon_years' => ['nullable', 'integer', 'min:1', 'max:20'],
+
+            'leverage.monthly_capacity' => ['nullable', 'numeric', 'min:644.02', 'max:200000'],
+            'leverage.target_patrimony' => ['nullable', 'numeric', 'min:100000', 'max:100000000'],
+            'leverage.seed' => ['nullable', 'integer', 'min:1', 'max:2147483647'],
         ];
     }
 }

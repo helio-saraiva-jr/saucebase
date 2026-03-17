@@ -440,6 +440,11 @@ class WorkflowController
     public function probabilityEngine(): Response
     {
         return Inertia::render('Megacombo::ProbabilityEngine', [
+            'audience' => 'representative',
+            'quickLinks' => [
+                ['label' => 'Dashboard', 'url' => route('dashboard')],
+                ['label' => 'Calculadora financeira', 'url' => route('megacombo.financial-calculator')],
+            ],
             'defaults' => [
                 'openMarket' => [
                     'participants' => 3000,
@@ -460,6 +465,48 @@ class WorkflowController
                     'quotas' => 5,
                     'horizonYears' => 3,
                 ],
+                'leverage' => [
+                    'monthlyCapacity' => 6500,
+                    'targetPatrimony' => 1000000,
+                    'seed' => null,
+                ],
+            ],
+        ]);
+    }
+
+    public function clientProbabilityEngine(): Response
+    {
+        return Inertia::render('Megacombo::ProbabilityEngine', [
+            'audience' => 'client',
+            'quickLinks' => [
+                ['label' => 'Portal do cliente', 'url' => route('megacombo.client-portal')],
+                ['label' => 'Calculadora financeira', 'url' => route('megacombo.client-financial-calculator')],
+            ],
+            'defaults' => [
+                'openMarket' => [
+                    'participants' => 3000,
+                    'durationMonths' => 200,
+                    'drawsPerMonth' => 1,
+                ],
+                'exclusiveGroup' => [
+                    'participants' => 650,
+                    'durationMonths' => 216,
+                    'drawsPerMonth' => 2,
+                ],
+                'snowball' => [
+                    'baseYearsWithoutBids' => 9,
+                    'targetReductionRate' => 0.3333,
+                    'freeBidsPerYear' => 6,
+                ],
+                'multiplier' => [
+                    'quotas' => 5,
+                    'horizonYears' => 3,
+                ],
+                'leverage' => [
+                    'monthlyCapacity' => 6500,
+                    'targetPatrimony' => 1000000,
+                    'seed' => null,
+                ],
             ],
         ]);
     }
@@ -467,6 +514,11 @@ class WorkflowController
     public function financialCalculator(): Response
     {
         return Inertia::render('Megacombo::FinancialCalculator', [
+            'audience' => 'representative',
+            'quickLinks' => [
+                ['label' => 'Dashboard', 'url' => route('dashboard')],
+                ['label' => 'Probabilidades', 'url' => route('megacombo.probability-engine')],
+            ],
             'defaults' => [
                 'creditValue' => 500000,
                 'installmentValue' => 3200,
@@ -479,6 +531,56 @@ class WorkflowController
             'constraints' => [
                 'desiredRatePercentMin' => 0.60,
                 'desiredRatePercentMax' => 0.85,
+            ],
+        ]);
+    }
+
+    public function clientFinancialCalculator(): Response
+    {
+        return Inertia::render('Megacombo::FinancialCalculator', [
+            'audience' => 'client',
+            'quickLinks' => [
+                ['label' => 'Portal do cliente', 'url' => route('megacombo.client-portal')],
+                ['label' => 'Motor de probabilidades', 'url' => route('megacombo.client-probability-engine')],
+            ],
+            'defaults' => [
+                'creditValue' => 500000,
+                'installmentValue' => 3200,
+                'remainingInstallments' => 216,
+                'desiredRatePercent' => 0.75,
+                'propertyValue' => 500000,
+                'bankMonthlyPayment' => 4200,
+                'bankTermYears' => 30,
+            ],
+            'constraints' => [
+                'desiredRatePercentMin' => 0.60,
+                'desiredRatePercentMax' => 0.85,
+            ],
+        ]);
+    }
+
+    public function aiSpecialist(Request $request): Response
+    {
+        $isClient = $request->user()?->hasRole('user') === true;
+
+        return Inertia::render('Megacombo::AiSpecialist', [
+            'audience' => $isClient ? 'client' : 'representative',
+            'quickLinks' => $isClient
+                ? [
+                    ['label' => 'Dashboard', 'url' => route('megacombo.client-portal')],
+                    ['label' => 'Calculadora financeira', 'url' => route('megacombo.client-financial-calculator')],
+                    ['label' => 'Motor de probabilidades', 'url' => route('megacombo.client-probability-engine')],
+                ]
+                : [
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Calculadora financeira', 'url' => route('megacombo.financial-calculator')],
+                    ['label' => 'Motor de probabilidades', 'url' => route('megacombo.probability-engine')],
+                ],
+            'suggestions' => [
+                'Qual o melhor cenário para acelerar a contemplação sem comprometer caixa?',
+                'Como comparar minha carteira atual de cotas com uma estratégia alternativa?',
+                'Quais ajustes de perfil reduzem risco e preservam valorização?',
+                'Como explicar o ponto de virada para um cliente em 2 minutos?',
             ],
         ]);
     }
